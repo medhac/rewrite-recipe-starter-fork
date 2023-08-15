@@ -5,10 +5,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.*;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.tree.TypeTree;
+import org.openrewrite.java.tree.*;
 
 import java.util.List;
 import java.util.Objects;
@@ -36,10 +33,12 @@ public class ConvertToFluentSyntax extends Recipe {
                     .contextSensitive()
                     .build();
            private String methodStatement = "";
-           private JavaType.FullyQualified topLevelClassName ;
 
-            @Override
+
+           @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration methodDeclaration, ExecutionContext executionContext) {
+
+                  JavaType.FullyQualified topLevelClassName;
 
                   // Check whether methods are already updated, if updated then return
                   if ((methodDeclaration.getMethodType() != null) &&
@@ -50,17 +49,20 @@ public class ConvertToFluentSyntax extends Recipe {
                   }
 
                   // Find methods with help of matchers
-                  if(methodDeclaration.getMethodType()!= null &&
+                if(methodDeclaration.getMethodType()!= null &&
                          methodDeclaration.getMethodType().getName().startsWith(methodMatcher.getTargetTypePattern().toString())) {
 
                       // Update the method return type from void to FullyQualified Class Name
                       topLevelClassName = getTopLevelClassType(getCursor());
-                      methodDeclaration = methodDeclaration.withReturnTypeExpression(TypeTree.build(topLevelClassName.getFullyQualifiedName()));
+                      methodDeclaration = methodDeclaration.withReturnTypeExpression(
+                              TypeTree.build(topLevelClassName.getFullyQualifiedName()));
+
 
                       // Safe to assert since we just added a body to the method
                       assert methodDeclaration.getBody() != null;
 
                       // Prepare the parameter for the chain method call from the constructor
+                      assert methodDeclaration.getMethodType() != null;
                       String parameters = (methodDeclaration.getMethodType().getName().substring(3)).toLowerCase();
                       methodStatement = methodStatement + "." + methodDeclaration.getMethodType().getName() + "(\"" + parameters + "\")";
 
@@ -70,7 +72,6 @@ public class ConvertToFluentSyntax extends Recipe {
                                       methodDeclaration.getBody().getCoordinates().lastStatement()),
                               executionContext
                       );
-
                   }
 
                   // Check if Constructor
@@ -92,12 +93,8 @@ public class ConvertToFluentSyntax extends Recipe {
                       JavaTemplate addStatementsTemplate = JavaTemplate.builder(methodStatement + ";")
                               .contextSensitive()
                               .build();
-                      methodDeclaration =
-                              maybeAutoFormat(
-                            methodDeclaration, addStatementsTemplate.apply(updateCursor(methodDeclaration),
-                                    methodDeclaration.getBody().getCoordinates().lastStatement()),
-                            executionContext
-                      );
+                      methodDeclaration = addStatementsTemplate.apply(updateCursor(methodDeclaration),
+                              methodDeclaration.getBody().getCoordinates().lastStatement());
                   }
                  return methodDeclaration;
             }
